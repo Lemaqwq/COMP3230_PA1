@@ -18,6 +18,18 @@ Note:
 <prompt> must be quoted with ""
 */
 
+/*
+* PLEASE WRITE DOWN FOLLOWING INFO BEFORE SUBMISSION
+* FILE NAME: main_3035844948.c
+* NAME: CHEN Liheng
+* UID: 3035844948
+* Development Platform: Linux
+* Remark: (How much you implemented?) All parts in the requirements have been completed
+* How to compile separately: 
+* gcc -o inference inference_3035844948.c -O3 -lm
+* gcc -o main main_3035844948.c
+*/
+
 #include "common.h"  // common headers
 
 #include <unistd.h>  
@@ -37,10 +49,31 @@ Sampler sampler;         // sampler instance to be init
 // Your Code Starts Here
 #include <signal.h>   // for handler and kill
 
+
+
+// Free the sampler, tokenizer and transformer
+void clean_up() {
+    fprintf(stdout, "[Inference] Cleaning up...\n");
+    free_sampler(&sampler);
+    free_tokenizer(&tokenizer);
+    free_transformer(&transformer);
+}
+
 // Handle SIGINT to allow clean termination
 void sigint_handler(int sig) {
-    fprintf(stderr, "\n[INFO] Inference process received SIGINT. Exiting...\n");
-    exit(0);
+    fprintf(stdout, "\n[Inference] Inference process received SIGINT. Exiting...\n");
+    clean_up();
+    exit(EXIT_FAILURE);
+}
+
+
+// Handle SIGUSR2 to exit when the max prompt is reached
+void SIGUSR2_handler(int sig) {
+    if (sig == SIGUSR2) {
+        fprintf(stdout, "[Main] Max prompt reached, exiting...\n");
+    }
+    clean_up();
+    exit(EXIT_SUCCESS);
 }
 
 // Your Code Ends Here
@@ -105,7 +138,7 @@ void generate(char *prompt) {
     free(prompt_tokens);
 }
 
-
+// main function
 int main(int argc, char *argv[]) {
 
     // default parameters
@@ -121,7 +154,9 @@ int main(int argc, char *argv[]) {
     // Your Code Starts Here
 
     signal(SIGINT, sigint_handler);  // Register SIGINT handler
+    signal(SIGUSR2, SIGUSR2_handler);  // Register SIGUSR2 handler
 
+    // parse command-line parameters via argv
     if (argc == 2) {
         rng_seed = atoi(argv[1]);
     } else {
@@ -138,18 +173,10 @@ int main(int argc, char *argv[]) {
     // build the Sampler
     build_sampler(&sampler, transformer.config.vocab_size, temperature, topp, rng_seed);
 
-    // Read prompt from stdin (via pipe from main process)
-    // char prompt[MAX_PROMPT_LEN];
-    // printf(">>> ");
-    // if (fgets(prompt, MAX_PROMPT_LEN, stdin) != NULL) {
-    //     prompts[num_prompt] = prompt;
-    //     fprintf(stderr, "Prompt: %s\n", prompts[num_prompt]);
-    //     num_prompt++;
-    // }
-
     // Read prompts from stdin in a continuous session
     char prompt[MAX_PROMPT_LEN];
 
+    // Read prompts from stdin in a continuous session
     while (fgets(prompt, MAX_PROMPT_LEN, stdin) != NULL) {
         prompts[num_prompt] = prompt;
         num_prompt++;
@@ -158,47 +185,9 @@ int main(int argc, char *argv[]) {
         kill(getppid(), SIGUSR1);  // Notify the main process that the inference is done
     }
 
-        
-    // if (argc >= 3) {
-    //     rng_seed = atoi(argv[1]);
-    //     num_prompt = (argc - 2) < 4 ? (argc - 2) : 4;
-    //     for (int i = 0; i < num_prompt; i++) {
-    //         prompts[i] = argv[i + 2];
-    //     }
-    // } else {
-    //     fprintf(stderr, "Usage:   ./inference <seed> <prompt1> <prompt2>\n");
-    //     fprintf(stderr, "Example: ./inference 42 \"What is Fibonacci Number?\" \"Can you give me a python program to generate Fibonacci Number?\"\n");
-    //     fprintf(stderr, "Note:    <prompt> must be quoted with \"\", at most 4 prompt is supported \n");
-    //     exit(EXIT_FAILURE);
-    //     /* target interface
-    //     fprintf(stderr, "Usage: ./inference <seed>\n");
-    //     fprintf(stderr, "Note:  this shall not be called directly, use ./entry <seed> \n");
-    //     exit(EXIT_FAILURE);
-    //     */
-    // }
-
-
-    // Your Code Ends Here
-
-    
-
-    // Generation Loop, update to match requirements
-    // Your code starts here
-
-    
-    
-
-
-    // for (int i = 0; i < num_prompt; i++) {
-    //     printf("user\n %s \n", prompts[i]);
-    //     generate(prompts[i]);   
-    // }
-
     // Your code ends here
     
     // memory and file handles cleanup
-    free_sampler(&sampler);
-    free_tokenizer(&tokenizer);
-    free_transformer(&transformer);
+    clean_up();
     return 0;
 }
